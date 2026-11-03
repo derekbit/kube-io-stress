@@ -43,19 +43,19 @@ By default:
 An existing StorageClass named `longhorn-v2-fio` must use `dataEngine: "v2"`.
 
 ```bash
-helm template random-stress-v3 ./longhorn-v2-random-write-chart-v3 | kubectl apply -f -
-kubectl get pod,pvc -l app=random-stress-v3
-kubectl logs -f random-stress-v3-w0
-kubectl get pods -l app=random-stress-v3 -w
-kubectl logs random-stress-v3-w0  # includes checksum verification results
+helm template stress ./kube-io-stress | kubectl apply -f -
+kubectl get pod,pvc -l app=stress
+kubectl logs -f stress-w0
+kubectl get pods -l app=stress -w
+kubectl logs stress-w0  # includes checksum verification results
 ```
 
 Or install using Helm release management:
 
 ```bash
-helm install random-stress-v3 ./longhorn-v2-random-write-chart-v3
+helm install stress ./kube-io-stress
 # After collecting results (destructive: PVCs will be removed):
-helm uninstall random-stress-v3
+helm uninstall stress
 ```
 
 ## Rerun and cleanup
@@ -69,7 +69,7 @@ sizes or worker counts, use new PVCs to avoid validating stale payload files.
 To remove template-applied resources:
 
 ```bash
-helm template random-stress-v3 ./longhorn-v2-random-write-chart-v3 | kubectl delete -f -
+helm template stress ./kube-io-stress | kubectl delete -f -
 ```
 
 **Destructive:** Deleting PVCs can delete their Longhorn volumes and payload data if
@@ -88,17 +88,17 @@ created `random-v2-*` resources, they are independent and require separate clean
 ## Pod status and troubleshooting
 
 ```bash
-kubectl get pods -l app=random-stress-v3
+kubectl get pods -l app=stress
 # Every successful worker eventually displays STATUS=Completed
-kubectl logs random-stress-v3-w0
-kubectl get pod random-stress-v3-w0 -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}{"\n"}'
+kubectl logs stress-w0
+kubectl get pod stress-w0 -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}{"\n"}'
 ```
 
 - Exit code `0`: all configured iterations passed write and SHA-256 verification.
 - Exit code `1` (or another nonzero code): write/checksum failed, Pod is Failed; see logs.
 - Pods are standalone and do not retry automatically. Other Pods keep running if one fails.
 - `helm upgrade` cannot modify an existing Pod's immutable `command`/`args` in place.
-  For a fresh benchmark, use this chart's new default `namePrefix: random-stress-v3` and
+  For a fresh benchmark, use this chart's new default `namePrefix: stress` and
   a new Helm release. Never `helm upgrade` a previous release solely to change Pod scripts: Helm
   may delete old named PVCs when they disappear from a release.
   **Do not uninstall the old release until you have saved any data you need** because
