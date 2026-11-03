@@ -1,0 +1,71 @@
+{{- $v := .Values -}}
+{{- if lt (int $v.parallel) 1 }}{{ fail "parallel must be >= 1" }}{{ end -}}
+{{- if lt (int $v.iterations) 1 }}{{ fail "iterations must be >= 1" }}{{ end -}}
+{{- if lt (int $v.dataVolumeCount) 1 }}{{ fail "dataVolumeCount must be >= 1" }}{{ end -}}
+{{- if lt (int $v.dataVolumeSizeGiB) 1 }}{{ fail "dataVolumeSizeGiB must be >= 1" }}{{ end -}}
+{{- if lt (int $v.dataSizeGiB) 1 }}{{ fail "dataSizeGiB must be >= 1" }}{{ end -}}
+{{- if ge (int $v.dataSizeGiB) (int $v.dataVolumeSizeGiB) }}{{ fail "dataSizeGiB must be smaller than dataVolumeSizeGiB to leave room for filesystem overhead" }}{{ end -}}
+{{- if lt (int $v.write.workers) 1 }}{{ fail "write.workers must be >= 1" }}{{ end -}}
+{{- if gt (int $v.write.workers) (mul (int $v.dataSizeGiB) 1024) }}{{ fail "write.workers must not exceed dataSizeGiB * 1024 MiB" }}{{ end -}}
+{{- range $worker := until (int $v.parallel) }}
+{{- range $volume := until (int $v.dataVolumeCount) }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $v.namePrefix }}-w{{ $worker }}-v{{ $volume }}
+  labels:
+    app: {{ $v.namePrefix | quote }}
+    worker: {{ $worker | quote }}
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: {{ $v.storageClass | quote }}
+  resources:
+    requests:
+      storage: {{ printf "%dGi" (int $v.dataVolumeSizeGiB) | quote }}
+{{- end }}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ $v.namePrefix }}-w{{ $worker }}
+  labels:
+    app: {{ $v.namePrefix | quote }}
+    worker: {{ $worker | quote }}
+spec:
+  restartPolicy: Never
+  containers:
+    - name: random-write
+      image: {{ $v.image | quote }}
+      imagePullPolicy: IfNotPresent
+      command: ["/bin/sh", "-ec"]
+      args:
+        - |
+{{ $.Files.Get "files/run.sh" | indent 10 }}
+      env:
+        - name: ITERATIONS
+          value: {{ $v.iterations | quote }}
+        - name: DATA_VOLUME_COUNT
+          value: {{ $v.dataVolumeCount | quote }}
+        - name: DATA_SIZE_MIB
+          value: {{ mul (int $v.dataSizeGiB) 1024 | quote }}
+        - name: WRITE_WORKERS
+          value: {{ $v.write.workers | quote }}
+      resources:
+        requests:
+          cpu: 500m
+          memory: 512Mi
+        limits:
+          memory: 2Gi
+      volumeMounts:
+{{- range $volume := until (int $v.dataVolumeCount) }}
+        - name: vol-{{ $volume }}
+          mountPath: /data/vol-{{ $volume }}
+{{- end }}
+  volumes:
+{{- range $volume := until (int $v.dataVolumeCount) }}
+    - name: vol-{{ $volume }}
+      persistentVolumeClaim:
+        claimName: {{ $v.namePrefix }}-w{{ $worker }}-v{{ $volume }}
+{{- end }}
+{{- end }}
