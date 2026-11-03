@@ -52,11 +52,7 @@ spec:
         - name: WRITE_WORKERS
           value: {{ $v.write.workers | quote }}
       resources:
-        requests:
-          cpu: 500m
-          memory: 512Mi
-        limits:
-          memory: 2Gi
+{{ toYaml $v.resources | indent 8 }}
       volumeMounts:
 {{- range $volume := until (int $v.dataVolumeCount) }}
         - name: vol-{{ $volume }}

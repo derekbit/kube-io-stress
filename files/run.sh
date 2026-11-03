@@ -62,6 +62,8 @@ while [ "$iteration" -le "$ITERATIONS" ]; do
         file="payload-$worker.bin"
         echo "[vol-$volume dd-$worker] writing $count MiB"
         dd if=/dev/urandom of="$dir/$file" bs=1M count="$count" conv=fsync status=none
+        # Match the reference guest write order: dd conv=fsync -> sync -> hash.
+        sync
         (cd "$dir" && sha256sum "$file") > "$dir/payload-$worker.sha256"
         echo "[vol-$volume dd-$worker] write + checksum finished"
       ) &

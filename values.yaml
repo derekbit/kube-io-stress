@@ -1,8 +1,8 @@
 # Same workload-size names/meanings as harvester-csi-stress CLI options:
 parallel: 12             # Concurrent Pod workers
-iterations: 3            # Sequential write + verify rounds per worker
+iterations: 100          # Sequential write + verify rounds per worker
 dataVolumeCount: 1       # Independent data PVCs per worker
-dataVolumeSizeGiB: 100   # Capacity of each PVC (100Gi)
+dataVolumeSizeGiB: 200   # Capacity of each PVC (200Gi)
 dataSizeGiB: 30          # Random data written per PVC per iteration (30GiB)
 
 namePrefix: io-stress
@@ -10,4 +10,13 @@ storageClass: longhorn-v2-replicated  # Existing StorageClass with dataEngine: "
 image: alpine:3.22
 
 write:
-  workers: 2             # Parallel dd processes per data PVC
+  workers: 1             # Reference uses one buffered dd per data disk
+
+# Match the reference README example (--memory 4Gi), not an upstream default.
+# 12 Pods request 48Gi total, in addition to Longhorn and other node workloads.
+resources:
+  requests:
+    cpu: 500m
+    memory: 4Gi
+  limits:
+    memory: 4Gi
